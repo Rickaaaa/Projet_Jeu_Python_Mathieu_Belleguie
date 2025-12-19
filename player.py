@@ -2,7 +2,6 @@ import pygame
 from constants import *
 from projectile import Projectile
 
-
 class Player(pygame.sprite.Sprite):
 
     def __init__(self):
@@ -53,12 +52,35 @@ class Player(pygame.sprite.Sprite):
             self.velocity_y = 0
             self.on_ground = True
 
-    def shoot(self):
-        projectile = Projectile(
-            self.rect.right,
-            self.rect.centery
-        )
+    # Tir avec option verticale
+    def shoot(self, target=None, target_y=None):
+        """
+        Crée un projectile.
+        target : un objet avec un rect (ex: Boss) ou None pour tir droit.
+        target_y : coordonnée Y pour tir vertical (salle 3)
+        """
+        if target_y is not None:
+            # Tir vertical vers target_y
+            projectile = Projectile(
+                self.rect.centerx,
+                self.rect.top,
+                target_pos=(self.rect.centerx, target_y)
+            )
+        elif target:
+            # Tir vers un ennemi ou boss
+            projectile = Projectile(
+                self.rect.centerx,
+                self.rect.centery,
+                target_pos=(target.rect.centerx, target.rect.centery)
+            )
+        else:
+            # Tir droit horizontal
+            projectile = Projectile(
+                self.rect.right,
+                self.rect.centery
+            )
         self.projectiles.add(projectile)
+
 
     # ❤️ Prendre des dégâts
     def take_damage(self, amount):
@@ -76,19 +98,11 @@ class Player(pygame.sprite.Sprite):
         y = self.rect.y - 25  # un peu plus haut pour le texte
 
         # Fond rouge
-        pygame.draw.rect(
-            screen,
-            (255, 0, 0),
-            (x, y, bar_width, bar_height)
-        )
+        pygame.draw.rect(screen, (255, 0, 0), (x, y, bar_width, bar_height))
 
         # Barre verte (vie restante)
         health_ratio = self.health / self.max_health
-        pygame.draw.rect(
-            screen,
-            (0, 255, 0),
-            (x, y, bar_width * health_ratio, bar_height)
-        )
+        pygame.draw.rect(screen, (0, 255, 0), (x, y, bar_width * health_ratio, bar_height))
 
         # Afficher le texte des PV
         health_text = pygame.font.Font(None, 20).render(

@@ -1,8 +1,7 @@
 import pygame
 import random
-from projectile_boss import ProjectileBoss
 from constants import *
-
+from projectile import Projectile  # On utilise le projectile classique
 
 class Boss(pygame.sprite.Sprite):
     def __init__(self, x, y):
@@ -74,7 +73,8 @@ class Boss(pygame.sprite.Sprite):
         if self.shots_left > 0 and self.rapid_fire_timer <= 0:
             self.rapid_fire_timer = self.rapid_fire_delay
             self.shots_left -= 1
-            return ProjectileBoss(self.rect.center, player_pos)
+            # Crée un projectile classique vers le joueur
+            return Projectile(self.rect.centerx, self.rect.centery, target_pos=player_pos)
 
         return None
 

@@ -5,7 +5,7 @@ from player import Player
 from enemy import Enemy
 from enemy_salle2 import EnemySalle2  # Nouveaux ennemis salle 2
 from boss import Boss
-from projectile_boss import ProjectileBoss
+from projectile import Projectile
 
 class Game:
 
@@ -156,7 +156,12 @@ class Game:
                 # Tir souris
                 if event.type == pygame.MOUSEBUTTONDOWN and self.state in ["combat", "combat_boss"] and not self.game_over:
                     if event.button == 1:
-                        self.player.shoot()
+                        if self.current_room == 2:
+                            # Tir vertical dans la salle du boss
+                            self.player.shoot(target_y=0)
+                        else:
+                            # Tir droit classique
+                            self.player.shoot()
 
                 # Spawn ennemis
                 if event.type == SPAWN_ENEMY_EVENT and self.state == "combat" and not self.game_over and self.wave_active:
@@ -168,11 +173,9 @@ class Game:
             # =====================
             if self.state == "transition_salle2":
                 GAME_FLOOR = 500
-
                 countdown = 3
                 font_big = pygame.font.Font(None, 60)
                 font_small = pygame.font.Font(None, 40)
-
                 for i in range(countdown, 0, -1):
                     self.screen.fill((0, 0, 0))
                     msg1 = font_big.render("Bravo, vous avez réussi la salle 1 !", True, (255, 255, 255))
@@ -188,14 +191,8 @@ class Game:
                 self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
                 self.enemies.empty()
                 self.spawn_enemy()
-
-                # Mettre le joueur plus bas
                 self.player.rect.y = GAME_FLOOR - self.player.rect.height
-
-                # Réinitialiser la vie du joueur
                 self.player.health = self.player.max_health
-
-                # Nombre d'ennemis à tuer pour salle 2
                 self.enemies_needed = 15
                 self.state = "combat"
                 self.enemies_killed = 0
@@ -206,25 +203,15 @@ class Game:
             # =====================
             if self.state == "transition_salle3":
                 GAME_FLOOR = 500
-
                 countdown = 3
                 font_big = pygame.font.Font(None, 60)
                 font_small = pygame.font.Font(None, 40)
-
                 for i in range(countdown, 0, -1):
                     self.screen.fill((0, 0, 0))
-                    msg1 = font_big.render(
-                        "Bravo, vous avez réussi la salle 2 !", True, (255, 255, 255)
-                    )
-                    msg2 = font_small.render(
-                        f"Le boss arrive dans {i}...", True, (255, 255, 255)
-                    )
-                    self.screen.blit(
-                        msg1, msg1.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 - 30))
-                    )
-                    self.screen.blit(
-                        msg2, msg2.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 30))
-                    )
+                    msg1 = font_big.render("Bravo, vous avez réussi la salle 2 !", True, (255, 255, 255))
+                    msg2 = font_small.render(f"Le boss arrive dans {i}...", True, (255, 255, 255))
+                    self.screen.blit(msg1, msg1.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 - 30)))
+                    self.screen.blit(msg2, msg2.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 30)))
                     pygame.display.flip()
                     pygame.time.delay(1000)
 
@@ -232,11 +219,7 @@ class Game:
                 self.current_room = 2
                 self.backgrounds.append("assets/images/background_room3.jpg")
                 self.background_image = pygame.image.load(self.backgrounds[self.current_room])
-                self.background_image = pygame.transform.scale(
-                    self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT)
-                )
-
-                # Position joueur + vie
+                self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
                 self.player.rect.y = GAME_FLOOR - self.player.rect.height
                 self.player.health = self.player.max_health
 
@@ -276,11 +259,9 @@ class Game:
                 if pygame.sprite.spritecollide(self.player, self.enemies, True):
                     self.player.take_damage(20)
 
-                # Game Over
                 if self.player.health <= 0:
                     self.game_over = True
 
-                # Passage à l’énigme
                 if self.enemies_killed >= self.enemies_needed:
                     self.state = "puzzle"
                     self.wave_active = False
@@ -290,23 +271,18 @@ class Game:
             # =====================
             if self.state == "combat_boss" and not self.game_over:
                 self.player.apply_gravity()
-
-                # Déplacement boss et tir
                 if self.boss:
                     self.boss.move()
                     projectile = self.boss.shoot(self.player.rect.center)
                     if projectile:
                         self.boss_projectiles.add(projectile)
 
-                # Déplacer projectiles boss
                 for proj in self.boss_projectiles:
                     proj.move()
 
-                # Collision joueur/projectiles boss
                 if pygame.sprite.spritecollide(self.player, self.boss_projectiles, True):
                     self.player.take_damage(20)
 
-                # Collision projectiles joueur/boss
                 if self.boss:
                     collisions = pygame.sprite.spritecollide(self.boss, self.player.projectiles, True)
                     for _ in collisions:
@@ -317,15 +293,16 @@ class Game:
                             self.boss_defeated = True
                             self.state = "victory"
 
+                if self.player.health <= 0:
+                    self.game_over = True
+
             # =====================
             # AFFICHAGE
             # =====================
             self.screen.blit(self.background_image, (0, 0))
             self.screen.blit(self.font.render(f"Score : {self.score}", True, (255, 0, 0)), (10, 10))
 
-            # =====================
             # INTRO
-            # =====================
             if self.state == "intro" and not self.intro_displayed:
                 intro_lines = [
                     "Bienvenue dans la salle 1",
@@ -341,9 +318,7 @@ class Game:
                 self.state = "combat"
                 self.intro_displayed = True
 
-            # =====================
             # COMBAT & AFFICHAGE ENNEMIS
-            # =====================
             if self.state in ["combat", "combat_boss"] and not self.game_over:
                 color = (255, 255, 255) if self.current_room == 1 else (0, 0, 0)
                 if self.state == "combat":
@@ -353,9 +328,7 @@ class Game:
                     text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, 50))
                     self.screen.blit(text_surface, text_rect)
 
-            # =====================
             # ÉNIGME
-            # =====================
             if self.state == "puzzle" and not self.game_over:
                 color = (255, 255, 255) if self.current_room == 1 else (0, 0, 0)
                 question_surface = self.font.render(self.puzzle_question, True, color)
@@ -369,9 +342,7 @@ class Game:
                 attempts_rect = attempts_surface.get_rect(center=(SCREEN_WIDTH // 2, 220))
                 self.screen.blit(attempts_surface, attempts_rect)
 
-            # =====================
             # Joueur et sprites
-            # =====================
             self.screen.blit(self.player.image, self.player.rect)
             self.player.draw_health_bar(self.screen)
             for enemy in self.enemies:
@@ -385,17 +356,13 @@ class Game:
                 self.screen.blit(self.boss.image, self.boss.rect)
                 self.boss.draw_health_bar(self.screen)
 
-            # =====================
             # VICTOIRE BOSS
-            # =====================
             if self.state == "victory":
                 self.screen.fill((0, 0, 0))
                 victory_text = self.font.render("BRAVO ! Vous avez vaincu le boss !", True, (255, 255, 255))
                 self.screen.blit(victory_text, victory_text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2)))
 
-            # =====================
             # GAME OVER
-            # =====================
             if self.game_over:
                 self.screen.fill((0, 0, 0))
                 self.screen.blit(
