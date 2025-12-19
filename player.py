@@ -66,14 +66,14 @@ class Player(pygame.sprite.Sprite):
         if self.health < 0:
             self.health = 0
 
-    # ❤️ Dessiner la barre de vie
+    # ❤️ Dessiner la barre de vie avec texte PV
     def draw_health_bar(self, screen):
         bar_width = 80
         bar_height = 8
 
         # Position au-dessus du joueur
         x = self.rect.x + 10
-        y = self.rect.y - 15
+        y = self.rect.y - 25  # un peu plus haut pour le texte
 
         # Fond rouge
         pygame.draw.rect(
@@ -89,3 +89,9 @@ class Player(pygame.sprite.Sprite):
             (0, 255, 0),
             (x, y, bar_width * health_ratio, bar_height)
         )
+
+        # Afficher le texte des PV
+        health_text = pygame.font.Font(None, 20).render(
+            f"{self.health} / {self.max_health} PV", True, (0, 0, 0)
+        )
+        screen.blit(health_text, (x, y - 15))
