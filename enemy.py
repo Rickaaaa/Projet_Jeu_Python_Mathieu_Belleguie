@@ -5,7 +5,7 @@ class Enemy(pygame.sprite.Sprite):
 
     def __init__(self, x, y):
         super().__init__()
-        self.image = pygame.image.load("assets/images/bat.png")
+        self.image = pygame.image.load("assets/images/enemy1.png")
         self.image = pygame.transform.scale(self.image, (80, 80))
         self.rect = self.image.get_rect()
         self.rect.x = x
