@@ -2,24 +2,20 @@ import pygame
 import random
 from constants import *
 from player import Player
-from enemy import Enemy
-from enemy_salle2 import EnemySalle2  # Nouveaux ennemis salle 2
+from enemy_salle2 import EnemySalle2  # On utilise les ennemis de la salle 2
 
-class Game:
+class GameSalle2:
 
     def __init__(self):
         # Fenêtre
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Ruines Mythologiques")
+        pygame.display.set_caption("Ruines Mythologiques - Salle 2")
 
-        # Décors par salle
-        self.backgrounds = [
-            "assets/images/background_room1.jpg",
-            "assets/images/background_room2.jpg"
-        ]
-        self.current_room = 0
-        self.background_image = pygame.image.load(self.backgrounds[self.current_room])
-        self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+        # Background salle 2
+        self.background_image = pygame.image.load("assets/images/background_room2.jpg")
+        self.background_image = pygame.transform.scale(
+            self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT)
+        )
 
         # Joueur
         self.player = Player()
@@ -28,7 +24,7 @@ class Game:
         self.enemies = pygame.sprite.Group()
 
         # États du jeu
-        self.state = "intro"  # intro | combat | puzzle | transition_salle2
+        self.state = "intro"  # intro | combat | puzzle | transition
         self.game_over = False
 
         # Score
@@ -36,15 +32,17 @@ class Game:
         self.font = pygame.font.Font(None, 32)
         self.game_over_font = pygame.font.Font(None, 80)
 
-        # Énigme salle 1
-        self.puzzle_question = "Quel dieu gardait les temples ?"
-        self.puzzle_answers = ["1. Anubis", "2. Zeus", "3. Hadès"]
+        # =====================
+        # ÉNIGME SALLE 2
+        # =====================
+        self.puzzle_question = "Quel dieu protège la salle 2 ?"
+        self.puzzle_answers = ["1. Athéna", "2. Poséidon", "3. Apollon"]
         self.correct_answer = 1
         self.attempts_left = 3
 
         # Vagues
         self.enemies_killed = 0
-        self.enemies_needed = 30
+        self.enemies_needed = 20  # moins d'ennemis pour salle 2
         self.wave_active = True
 
         # Intro affichée
@@ -57,16 +55,13 @@ class Game:
         self.running = True
 
     # =====================
-    # Spawn ennemis selon la salle
+    # Spawn ennemis salle 2
     # =====================
     def spawn_enemy(self):
         for _ in range(random.randint(2, 4)):
             x = SCREEN_WIDTH + random.randint(0, 300)
             y = GAME_FLOOR - random.randint(0, 120)
-            if self.current_room == 0:
-                self.enemies.add(Enemy(x, y))
-            else:
-                self.enemies.add(EnemySalle2(x, y))
+            self.enemies.add(EnemySalle2(x, y))
         self.wave_active = True
 
     # =====================
@@ -80,7 +75,7 @@ class Game:
             self.player.move_left()
 
     # =====================
-    # Reset complet du jeu
+    # Reset complet salle 2
     # =====================
     def reset_game(self):
         self.player = Player()
@@ -90,13 +85,10 @@ class Game:
         self.score = 0
         self.state = "intro"
         self.game_over = False
-        self.current_room = 0
         self.attempts_left = 3
         self.wave_active = True
         self.enemies_killed = 0
         self.intro_displayed = False
-        self.background_image = pygame.image.load(self.backgrounds[self.current_room])
-        self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
         self.spawn_enemy()
 
     # =====================
@@ -129,7 +121,7 @@ class Game:
                         if event.key in [pygame.K_1, pygame.K_2, pygame.K_3]:
                             answer = event.key - pygame.K_0
                             if answer == self.correct_answer:
-                                self.state = "transition_salle2"  # nouvel état
+                                self.state = "transition"
                             else:
                                 self.attempts_left -= 1
                                 if self.attempts_left <= 0:
@@ -156,28 +148,30 @@ class Game:
             # =====================
             if self.state == "combat" and not self.game_over:
                 self.player.apply_gravity()
+
                 for enemy in self.enemies:
                     enemy.move()
+
                 for projectile in self.player.projectiles:
                     projectile.move()
 
-                # Collisions projectiles / ennemis
-                collisions = pygame.sprite.groupcollide(self.player.projectiles, self.enemies, True, False)
-                for projectile, enemies_hit in collisions.items():
-                    for enemy in enemies_hit:
-                        if hasattr(enemy, 'take_damage'):
-                            enemy.take_damage()
-                            if enemy.health <= 0:
-                                enemy.kill()
-                                self.score += 1
-                                self.enemies_killed += 1
-                        else:
+                # Collisions projectiles / ennemis salle 2
+                collisions = pygame.sprite.groupcollide(
+                    self.player.projectiles,
+                    self.enemies,
+                    True,
+                    False  # on ne supprime pas directement, car 2 coups nécessaires
+                )
+                for enemy_list in collisions.values():
+                    for enemy in enemy_list:
+                        enemy.take_damage(50)  # 50 par projectile
+                        if enemy.health <= 0:
                             enemy.kill()
                             self.score += 1
                             self.enemies_killed += 1
 
                 # Collision joueur / ennemis
-                if pygame.sprite.spritecollide(self.player, self.enemies, True):
+                if pygame.sprite.spritecollide(self.player, self.enemies, False):
                     self.player.take_damage(20)
 
                 # Game Over
@@ -190,35 +184,20 @@ class Game:
                     self.wave_active = False
 
             # =====================
-            # TRANSITION VERS SALLE 2
+            # TRANSITION FIN ENIGME
             # =====================
-            if self.state == "transition_salle2":
-                countdown = 3
-                font_big = pygame.font.Font(None, 60)
-                font_small = pygame.font.Font(None, 40)
+            if self.state == "transition":
+                self.screen.fill((0, 0, 0))
+                text = self.game_over_font.render("Salle 1 suivante...", True, (255, 255, 255))
+                self.screen.blit(text, text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)))
+                pygame.display.flip()
+                pygame.time.delay(2000)
 
-                for i in range(countdown, 0, -1):
-                    self.screen.fill((0, 0, 0))
-                    msg1 = font_big.render("Bravo, vous avez réussi la salle 1 !", True, (255, 255, 255))
-                    msg2 = font_small.render(f"Vous allez entrer dans la salle 2 dans {i}...", True, (255, 255, 255))
-                    self.screen.blit(msg1, msg1.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 - 30)))
-                    self.screen.blit(msg2, msg2.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 30)))
-                    pygame.display.flip()
-                    pygame.time.delay(1000)
-
-                # Charger salle 2
-                self.current_room = 1
-                self.background_image = pygame.image.load(self.backgrounds[self.current_room])
-                self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
-
-                # Ennemis salle 2
-                self.enemies.empty()
-                self.spawn_enemy()
-
-                # Revenir à l'état combat
-                self.state = "combat"
-                self.enemies_killed = 0
-                self.wave_active = True
+                # On relance le jeu de la salle 1
+                from game import Game
+                game = Game()
+                game.run()
+                return  # quitte la salle 2
 
             # =====================
             # AFFICHAGE
@@ -231,9 +210,9 @@ class Game:
             # =====================
             if self.state == "intro" and not self.intro_displayed:
                 intro_lines = [
-                    "Bienvenue dans la salle 1",
-                    "Vous devez éliminer 30 ennemis avant de pouvoir",
-                    "répondre à l'énigme et accéder à la salle 2"
+                    "Bienvenue dans la salle 2",
+                    "Vous devez éliminer 20 ennemis avant de pouvoir",
+                    "répondre à l'énigme et revenir à la salle 1"
                 ]
                 for i, line in enumerate(intro_lines):
                     text_surface = self.font.render(line, True, (0, 0, 0))
@@ -261,11 +240,15 @@ class Game:
                 question_surface = self.font.render(self.puzzle_question, True, (0, 0, 0))
                 question_rect = question_surface.get_rect(center=(SCREEN_WIDTH // 2, 50))
                 self.screen.blit(question_surface, question_rect)
+
                 for i, ans in enumerate(self.puzzle_answers):
                     ans_surface = self.font.render(ans, True, (0, 0, 0))
                     ans_rect = ans_surface.get_rect(center=(SCREEN_WIDTH // 2, 100 + i * 40))
                     self.screen.blit(ans_surface, ans_rect)
-                attempts_surface = self.font.render(f"Tentatives restantes : {self.attempts_left}", True, (255, 0, 0))
+
+                attempts_surface = self.font.render(
+                    f"Tentatives restantes : {self.attempts_left}", True, (255, 0, 0)
+                )
                 attempts_rect = attempts_surface.get_rect(center=(SCREEN_WIDTH // 2, 220))
                 self.screen.blit(attempts_surface, attempts_rect)
 
@@ -274,7 +257,9 @@ class Game:
             # =====================
             self.screen.blit(self.player.image, self.player.rect)
             self.player.draw_health_bar(self.screen)
-            self.enemies.draw(self.screen)
+            for enemy in self.enemies:
+                self.screen.blit(enemy.image, enemy.rect)
+                enemy.draw_health_bar(self.screen)
             self.player.projectiles.draw(self.screen)
 
             # =====================
