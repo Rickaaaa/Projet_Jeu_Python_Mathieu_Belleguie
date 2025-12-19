@@ -129,7 +129,7 @@ class Game:
                         if event.key in [pygame.K_1, pygame.K_2, pygame.K_3]:
                             answer = event.key - pygame.K_0
                             if answer == self.correct_answer:
-                                self.state = "transition_salle2"  # nouvel état
+                                self.state = "transition_salle2"
                             else:
                                 self.attempts_left -= 1
                                 if self.attempts_left <= 0:
@@ -150,6 +150,59 @@ class Game:
                 if event.type == SPAWN_ENEMY_EVENT and self.state == "combat" and not self.game_over and self.wave_active:
                     if len(self.enemies) < 4:
                         self.spawn_enemy()
+
+            # =====================
+            # Transition salle 2
+            # =====================
+            if self.state == "transition_salle2":
+                # Ajuster la position du sol pour salle 2
+                global GAME_FLOOR
+                GAME_FLOOR = 500  # adapte selon ta salle 2
+
+                countdown = 3
+                font_big = pygame.font.Font(None, 60)
+                font_small = pygame.font.Font(None, 40)
+
+                for i in range(countdown, 0, -1):
+                    self.screen.fill((0, 0, 0))
+                    msg1 = font_big.render("Bravo, vous avez réussi la salle 1 !", True, (255, 255, 255))
+                    msg2 = font_small.render(f"Vous allez entrer dans la salle 2 dans {i}...", True, (255, 255, 255))
+                    self.screen.blit(msg1, msg1.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 - 30)))
+                    self.screen.blit(msg2, msg2.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 30)))
+                    pygame.display.flip()
+                    pygame.time.delay(1000)
+
+                # Charger salle 2
+                self.current_room = 1
+                self.background_image = pygame.image.load(self.backgrounds[self.current_room])
+                self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+
+                # Ennemis salle 2
+                self.enemies.empty()
+                self.spawn_enemy()
+
+                # Mettre le joueur plus bas
+                self.player.rect.y = GAME_FLOOR - self.player.rect.height
+
+                # Nombre d'ennemis à tuer pour salle 2
+                self.enemies_needed = 15
+
+                # Revenir à l'état combat
+                self.state = "combat"
+                self.enemies_killed = 0
+                self.wave_active = True
+
+                # Mettre le joueur plus bas dans la salle 2
+                self.player.rect.y = GAME_FLOOR - self.player.rect.height
+
+                # Nombre d'ennemis à tuer pour la salle 2
+                self.enemies_needed = 15
+
+                # Revenir à l'état combat
+                self.state = "combat"
+                self.enemies_killed = 0
+                self.wave_active = True
+
 
             # =====================
             # LOGIQUE COMBAT
@@ -190,37 +243,6 @@ class Game:
                     self.wave_active = False
 
             # =====================
-            # TRANSITION VERS SALLE 2
-            # =====================
-            if self.state == "transition_salle2":
-                countdown = 3
-                font_big = pygame.font.Font(None, 60)
-                font_small = pygame.font.Font(None, 40)
-
-                for i in range(countdown, 0, -1):
-                    self.screen.fill((0, 0, 0))
-                    msg1 = font_big.render("Bravo, vous avez réussi la salle 1 !", True, (255, 255, 255))
-                    msg2 = font_small.render(f"Vous allez entrer dans la salle 2 dans {i}...", True, (255, 255, 255))
-                    self.screen.blit(msg1, msg1.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 - 30)))
-                    self.screen.blit(msg2, msg2.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 30)))
-                    pygame.display.flip()
-                    pygame.time.delay(1000)
-
-                # Charger salle 2
-                self.current_room = 1
-                self.background_image = pygame.image.load(self.backgrounds[self.current_room])
-                self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
-
-                # Ennemis salle 2
-                self.enemies.empty()
-                self.spawn_enemy()
-
-                # Revenir à l'état combat
-                self.state = "combat"
-                self.enemies_killed = 0
-                self.wave_active = True
-
-            # =====================
             # AFFICHAGE
             # =====================
             self.screen.blit(self.background_image, (0, 0))
@@ -248,8 +270,9 @@ class Game:
             # COMBAT
             # =====================
             if self.state == "combat" and not self.game_over:
+                color = (255, 255, 255) if self.current_room == 1 else (0, 0, 0)
                 text_surface = self.font.render(
-                    f"Ennemis tués : {self.enemies_killed} / {self.enemies_needed}", True, (0, 0, 0)
+                    f"Ennemis tués : {self.enemies_killed} / {self.enemies_needed}", True, color
                 )
                 text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, 50))
                 self.screen.blit(text_surface, text_rect)
@@ -258,23 +281,37 @@ class Game:
             # ÉNIGME
             # =====================
             if self.state == "puzzle" and not self.game_over:
-                question_surface = self.font.render(self.puzzle_question, True, (0, 0, 0))
+                # Couleur : blanc si salle 2, noir sinon
+                color = (255, 255, 255) if self.current_room == 1 else (0, 0, 0)
+
+                # Question
+                question_surface = self.font.render(self.puzzle_question, True, color)
                 question_rect = question_surface.get_rect(center=(SCREEN_WIDTH // 2, 50))
                 self.screen.blit(question_surface, question_rect)
+
+                # Réponses
                 for i, ans in enumerate(self.puzzle_answers):
-                    ans_surface = self.font.render(ans, True, (0, 0, 0))
+                    ans_surface = self.font.render(ans, True, color)
                     ans_rect = ans_surface.get_rect(center=(SCREEN_WIDTH // 2, 100 + i * 40))
                     self.screen.blit(ans_surface, ans_rect)
+
+                # Tentatives restantes (toujours en rouge)
                 attempts_surface = self.font.render(f"Tentatives restantes : {self.attempts_left}", True, (255, 0, 0))
                 attempts_rect = attempts_surface.get_rect(center=(SCREEN_WIDTH // 2, 220))
                 self.screen.blit(attempts_surface, attempts_rect)
+
 
             # =====================
             # Joueur et sprites
             # =====================
             self.screen.blit(self.player.image, self.player.rect)
             self.player.draw_health_bar(self.screen)
-            self.enemies.draw(self.screen)
+
+            for enemy in self.enemies:
+                self.screen.blit(enemy.image, enemy.rect)
+                if hasattr(enemy, 'draw_health_bar'):
+                    enemy.draw_health_bar(self.screen)
+
             self.player.projectiles.draw(self.screen)
 
             # =====================
