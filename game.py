@@ -2,7 +2,7 @@ import pygame
 from constants import *
 from player import Player
 from projectile import Projectile
-# On importe nos nouvelles salles
+# On importe nos nouvelles salles (Assure-toi que levels.py existe)
 from levels import Room1, Room2, RoomBoss
 
 class Game:
@@ -11,13 +11,23 @@ class Game:
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Ruines Mythologiques")
 
-        # Chargement écran titre
+        # --- CHARGEMENT DES IMAGES ---
+        # 1. Écran titre
         try:
             self.menu_background = pygame.image.load("assets/images/loading_background.jpg")
             self.menu_background = pygame.transform.scale(self.menu_background, (SCREEN_WIDTH, SCREEN_HEIGHT))
         except FileNotFoundError:
             self.menu_background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
             self.menu_background.fill((0, 0, 0))
+            
+        # 2. Écran Victoire
+        try:
+            self.victory_background = pygame.image.load("assets/images/victory.png")
+            self.victory_background = pygame.transform.scale(self.victory_background, (SCREEN_WIDTH, SCREEN_HEIGHT))
+        except FileNotFoundError:
+            # Si l'image manque, on met un fond or/marron pour la victoire
+            self.victory_background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            self.victory_background.fill((100, 80, 0))
 
         # --- SYSTÈME DE SALLES ---
         # On stocke les 3 objets salles dans une liste
@@ -40,6 +50,8 @@ class Game:
         self.score = 0
         
         self.font = pygame.font.Font(None, 32)
+        # Font un peu plus grosse pour le gros titre de victoire
+        self.font_victory_title = pygame.font.Font(None, 110) 
         self.font_title = pygame.font.Font(None, 90)
         self.font_subtitle = pygame.font.Font(None, 40)
         self.game_over_font = pygame.font.Font(None, 80)
@@ -92,6 +104,10 @@ class Game:
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                self.running = False
+            
+            # Touche ECHAP pour quitter
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 self.running = False
 
             if event.type == pygame.KEYDOWN:
@@ -187,12 +203,14 @@ class Game:
             rect = text_surf.get_rect(center=(SCREEN_WIDTH // 2, start_y + i * line_spacing))
             self.screen.blit(text_surf, rect)
 
-    def transition_sequence(self, next_room_idx, msg_bravo):
+    # J'ai modifié cette fonction pour accepter le texte personnalisé (msg_compteur)
+    def transition_sequence(self, next_room_idx, msg_bravo, msg_compteur):
         """Gère l'écran noir de chargement"""
-        for i in range(3, 0, -1):
+        for i in range(5, 0, -1): 
             self.screen.fill((0, 0, 0))
             t1 = pygame.font.Font(None, 60).render(msg_bravo, True, (255, 255, 255))
-            t2 = pygame.font.Font(None, 40).render(f"Chargement dans {i}...", True, (255, 255, 255))
+            # Ici on affiche le message personnalisé + le chiffre
+            t2 = pygame.font.Font(None, 40).render(f"{msg_compteur} {i}...", True, (255, 255, 255))
             self.screen.blit(t1, t1.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 - 30)))
             self.screen.blit(t2, t2.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 30)))
             pygame.display.flip()
@@ -212,33 +230,42 @@ class Game:
 
         while self.running:
             clock.tick(60)
+            
+            # Gravité sauf dans les menus
             if self.state not in ["start_menu", "victory", "game_over"]:
                 self.player.apply_gravity()
             
+            # Gestion des entrées (Quitter, Bouger, Tirer)
             self.handle_input()
+            
+            # Si handle_input a mis running à False, on sort de la boucle tout de suite
             if not self.running: break
 
             # --- LOGIQUE TRANSITIONS ---
             if self.state == "transition_salle2":
-                self.transition_sequence(1, "Bravo, salle 1 terminée !")
+                # ICI : On remet les textes exacts
+                self.transition_sequence(1, "Bravo, vous avez réussi la salle 1 !", "Salle 2 dans")
+                
                 # On affiche l'intro de la salle 2
                 self.screen.blit(self.background_image, (0, 0))
                 self.screen.blit(self.player.image, self.player.rect)
                 for e in self.enemies: self.screen.blit(e.image, e.rect)
                 self.draw_intro_text()
                 pygame.display.flip()
-                pygame.time.delay(4000)
+                pygame.time.delay(8000)
                 self.state = "combat"
 
             if self.state == "transition_salle3":
-                self.transition_sequence(2, "Bravo, salle 2 terminée !")
+                # ICI : On remet les textes exacts pour le boss
+                self.transition_sequence(2, "Bravo, vous avez réussi la salle 2 !", "BOSS FINAL dans")
+                
                 # On affiche l'intro du boss
                 self.screen.blit(self.background_image, (0, 0))
                 self.screen.blit(self.player.image, self.player.rect)
                 if self.boss: self.screen.blit(self.boss.image, self.boss.rect)
                 self.draw_intro_text()
                 pygame.display.flip()
-                pygame.time.delay(4000)
+                pygame.time.delay(8000)
                 self.state = "combat_boss"
 
 
@@ -251,9 +278,17 @@ class Game:
                 hits = pygame.sprite.groupcollide(self.player.projectiles, self.enemies, True, False)
                 for proj, enemy_list in hits.items():
                     for e in enemy_list:
-                        if hasattr(e, 'take_damage'): e.take_damage() # Salle 2
-                        else: e.kill() # Salle 1
-                        if e.health <= 0 or not hasattr(e, 'health'):
+                        
+                        # CAS 1 : Ennemis résistants (qui ont la fonction take_damage et des PV)
+                        if hasattr(e, 'take_damage'): 
+                            e.take_damage()
+                            if e.health <= 0:
+                                e.kill()
+                                self.score += 1
+                                self.enemies_killed += 1
+                        
+                        # CAS 2 : Ennemis simples (Salle 1, meurent en 1 coup)
+                        else: 
                             e.kill()
                             self.score += 1
                             self.enemies_killed += 1
@@ -297,7 +332,7 @@ class Game:
                 
                 if (pygame.time.get_ticks() // 500) % 2 == 0:
                     s = self.font.render("Appuyez sur ENTREE pour commencer", True, (255, 0, 0))
-                    self.screen.blit(s, s.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT - 180)))
+                    self.screen.blit(s, s.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT - 140)))
 
             else:
                 self.screen.blit(self.background_image, (0, 0))
@@ -307,13 +342,13 @@ class Game:
                 if self.state == "intro" and not self.intro_displayed:
                     self.draw_intro_text()
                     pygame.display.flip()
-                    pygame.time.delay(4000)
+                    pygame.time.delay(8000)
                     self.state = "combat"
                     self.intro_displayed = True
 
                 # UI Combat
                 if self.state == "combat":
-                    t = self.font.render(f"Ennemis : {self.enemies_killed} / {self.current_level.enemies_needed}", True, (255, 255, 255))
+                    t = self.font.render(f"Ennemis tués : {self.enemies_killed} / {self.current_level.enemies_needed}", True, (255, 255, 255))
                     self.screen.blit(t, (SCREEN_WIDTH//2 - 50, 50))
 
                 # UI Puzzle
@@ -345,13 +380,34 @@ class Game:
                     self.screen.blit(self.boss.image, self.boss.rect)
                     self.boss.draw_health_bar(self.screen)
 
-                # Victoire
+                # ÉCRAN DE VICTOIRE JOLI
                 if self.state == "victory":
-                    self.screen.fill((0, 0, 0))
-                    v = self.font.render("BRAVO ! VICTOIRE TOTALE !", True, (255, 215, 0))
-                    self.screen.blit(v, v.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2)))
-                    q = self.font.render("Appuyez sur la croix pour quitter", True, (255, 255, 255))
-                    self.screen.blit(q, q.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 50)))
+                    self.screen.blit(self.victory_background, (0, 0))
+                    
+                    titre_txt = "BRAVO ! VICTOIRE TOTALE !"
+                    sous_titre_txt = "Vous avez triomphé des épreuves mythologiques."
+                    quitter_txt = "Appuyez sur la touche ECHAP pour quitter."
+
+                    # Ombre
+                    shadow_surf = self.font_victory_title.render(titre_txt, True, (0, 0, 0))
+                    shadow_rect = shadow_surf.get_rect(center=(SCREEN_WIDTH//2 + 3, SCREEN_HEIGHT//3 + 3))
+                    self.screen.blit(shadow_surf, shadow_rect)
+                    
+                    # Titre Or
+                    titre_surf = self.font_victory_title.render(titre_txt, True, (255, 215, 0))
+                    titre_rect = titre_surf.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//3))
+                    self.screen.blit(titre_surf, titre_rect)
+
+                    # Sous-titre
+                    sous_titre_surf = self.font_subtitle.render(sous_titre_txt, True, (255, 255, 255))
+                    sous_titre_rect = sous_titre_surf.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2))
+                    self.screen.blit(sous_titre_surf, sous_titre_rect)
+
+                    # Instructions
+                    q_surf = self.font.render(quitter_txt, True, (200, 200, 200))
+                    q_rect = q_surf.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT * 0.8))
+                    self.screen.blit(q_surf, q_rect)
+
 
                 # Game Over
                 if self.game_over:
