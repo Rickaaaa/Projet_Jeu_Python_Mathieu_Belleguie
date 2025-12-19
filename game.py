@@ -4,52 +4,74 @@ from constants import *
 from player import Player
 from enemy import Enemy
 
-
 class Game:
 
     def __init__(self):
-        # Initialisation de la fenêtre
+        # Fenêtre
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Mon Premier Jeu")
+        pygame.display.set_caption("Ruines Mythologiques")
 
-        # Image d'arrière-plan
-        self.backgroung_image = pygame.image.load('assets/images/background.jpg')
-        self.backgroung_image = pygame.transform.scale(
-            self.backgroung_image, (SCREEN_WIDTH, SCREEN_HEIGHT)
+        # Décors par salle
+        self.backgrounds = [
+            "assets/images/background_room1.jpg",
+            "assets/images/background_room2.jpg"
+        ]
+        self.current_room = 0
+
+        self.background_image = pygame.image.load(self.backgrounds[self.current_room])
+        self.background_image = pygame.transform.scale(
+            self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT)
         )
 
         # Joueur
         self.player = Player()
 
-        # Groupe d'ennemis
+        # Ennemis
         self.enemies = pygame.sprite.Group()
 
-        # Créer un premier ennemi
-        self.spawn_enemy()
+        # États du jeu
+        self.state = "intro"  # intro | combat | puzzle | transition | game_over
 
         # Score
         self.score = 0
-        self.font = pygame.font.Font(None, 30)
-
-        # Boucle du jeu
-        self.running = True
-
-        # GAME OVER
-        self.game_over = False
+        self.font = pygame.font.Font(None, 32)
         self.game_over_font = pygame.font.Font(None, 80)
 
-    # Apparition d'une vague d'ennemis
-    def spawn_enemy(self):
-        num_enemies = random.randint(1, 3)  # 1 à 3 ennemis par vague
-        for _ in range(num_enemies):
-            x = SCREEN_WIDTH + random.randint(0, 200)  # légèrement hors écran
-            y = GAME_FLOOR - random.randint(0, 150)  # hauteur aléatoire
-            enemy = Enemy(x, y)
-            # Optionnel : vitesse proportionnelle à la hauteur
-            enemy.speed += (GAME_FLOOR - y) // 50
-            self.enemies.add(enemy)
+        # =====================
+        # ÉNIGME SALLE 1
+        # =====================
+        self.puzzle_question = "Quel dieu gardait les temples ?"
+        self.puzzle_answers = ["1. Anubis", "2. Zeus", "3. Hadès"]
+        self.correct_answer = 1  # touche 1
+        self.attempts_left = 3
 
-    # Déplacement joueur
+        # Vagues
+        self.spawn_enemy()
+
+        self.running = True 
+
+        # Compteur d'ennemis tués
+        self.enemies_killed = 0
+        self.enemies_needed = 20  # nombre total à tuer pour passer à l'énigme
+
+        # Transition vague → énigme
+        self.wave_cleared_time = None
+        self.wave_delay = 1500  # 1.5 secondes
+        self.wave_active = True  # Vague active
+
+    # =====================
+    # Ennemis
+    # =====================
+    def spawn_enemy(self):
+        for _ in range(random.randint(2, 4)):
+            x = SCREEN_WIDTH + random.randint(0, 300)
+            y = GAME_FLOOR - random.randint(0, 120)
+            self.enemies.add(Enemy(x, y))
+        self.wave_active = True
+
+    # =====================
+    # Clavier
+    # =====================
     def keyboard(self):
         keys = pygame.key.get_pressed()
         if keys[pygame.K_RIGHT]:
@@ -57,123 +79,222 @@ class Game:
         elif keys[pygame.K_LEFT]:
             self.player.move_left()
 
-    # Réinitialiser le jeu
+    # =====================
+    # Reset jeu
+    # =====================
     def reset_game(self):
         self.player = Player()
         self.enemies.empty()
-        self.spawn_enemy()
         self.score = 0
-        self.game_over = False
+        self.state = "intro"
+        self.current_room = 0
+        self.attempts_left = 3
+        self.wave_active = True
+        self.enemies_killed = 0
 
+        self.background_image = pygame.image.load(self.backgrounds[self.current_room])
+        self.background_image = pygame.transform.scale(
+            self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT)
+        )
+
+        self.spawn_enemy()
+
+    # =====================
+    # Boucle principale
+    # =====================
     def run(self):
         clock = pygame.time.Clock()
 
-        # Timer pour faire apparaître des vagues d'ennemis
         SPAWN_ENEMY_EVENT = pygame.USEREVENT + 1
-        pygame.time.set_timer(SPAWN_ENEMY_EVENT, 2000)  # toutes les 2 secondes
+        pygame.time.set_timer(SPAWN_ENEMY_EVENT, 2000)
+
+        intro_displayed = False  # pour afficher le message d’intro une seule fois
 
         while self.running:
             clock.tick(60)
-
-            # Gestion clavier
             self.keyboard()
 
-            # Gestion des événements
+            # =====================
+            # ÉVÉNEMENTS
+            # =====================
             for event in pygame.event.get():
 
-                # Quitter le jeu
                 if event.type == pygame.QUIT:
-                    self.running = False
                     pygame.quit()
+                    self.running = False
 
-                # Saut ou rejouer
                 if event.type == pygame.KEYDOWN:
-                    if not self.game_over:
-                        if event.key == pygame.K_UP:
-                            self.player.jump()
-                    else:
-                        if event.key == pygame.K_RETURN:
-                            self.reset_game()
 
-                # Tir avec clic gauche
+                    # SAUT
+                    if self.state == "combat" and event.key == pygame.K_UP:
+                        self.player.jump()
+
+                    # ÉNIGME
+                    if self.state == "puzzle":
+                        if event.key in [pygame.K_1, pygame.K_2, pygame.K_3]:
+                            answer = event.key - pygame.K_0
+                            if answer == self.correct_answer:
+                                self.state = "transition"
+                            else:
+                                self.attempts_left -= 1
+                                if self.attempts_left <= 0:
+                                    self.attempts_left = 3
+                                    self.state = "combat"
+                                    self.spawn_enemy()
+
+                    # GAME OVER → rejouer
+                    if self.state == "game_over" and event.key == pygame.K_RETURN:
+                        self.reset_game()
+
+                # Tir souris
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    if not self.game_over and event.button == 1:
+                    if self.state == "combat" and event.button == 1:
                         self.player.shoot()
 
                 # Spawn ennemis
-                if event.type == SPAWN_ENEMY_EVENT and not self.game_over:
-                    self.spawn_enemy()
+                if event.type == SPAWN_ENEMY_EVENT and self.state == "combat" and self.wave_active:
+                    if len(self.enemies) < 4:
+                        self.spawn_enemy()
 
-            # Si GAME OVER, afficher écran noir + instructions
-            if self.game_over:
+            # =====================
+            # LOGIQUE COMBAT
+            # =====================
+            if self.state == "combat":
+                self.player.apply_gravity()
+
+                for enemy in self.enemies:
+                    enemy.move()
+
+                for projectile in self.player.projectiles:
+                    projectile.move()
+
+                # Collisions
+                collisions = pygame.sprite.groupcollide(
+                    self.player.projectiles,
+                    self.enemies,
+                    True,
+                    True
+                )
+                if collisions:
+                    self.score += len(collisions)
+                    self.enemies_killed += len(collisions)
+
+                if pygame.sprite.spritecollide(self.player, self.enemies, True):
+                    self.player.take_damage(10)
+
+                if self.player.health <= 0:
+                    self.state = "game_over"
+
+                # Vérifier si on a tué 20 ennemis
+                if self.enemies_killed >= self.enemies_needed:
+                    self.state = "puzzle"
+                    self.wave_active = False
+
+            # =====================
+            # TRANSITION SALLE
+            # =====================
+            if self.state == "transition":
                 self.screen.fill((0, 0, 0))
-
-                # Texte GAME OVER
-                game_over_text = self.game_over_font.render(
-                    "GAME OVER", True, (255, 0, 0)
+                text = self.game_over_font.render(
+                    "Salle suivante...", True, (255, 255, 255)
                 )
-                game_over_rect = game_over_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 40))
-                self.screen.blit(game_over_text, game_over_rect)
-
-                # Instruction pour rejouer
-                replay_font = pygame.font.Font(None, 40)
-                replay_text = replay_font.render(
-                    "Appuyez sur ENTREE pour rejouer", True, (255, 255, 255)
+                self.screen.blit(
+                    text,
+                    text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
                 )
-                replay_rect = replay_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 30))
-                self.screen.blit(replay_text, replay_rect)
-
                 pygame.display.flip()
-                continue  # passer au prochain frame
+                pygame.time.delay(2000)
 
-            # Physique joueur
-            self.player.apply_gravity()
+                self.current_room += 1
+                if self.current_room < len(self.backgrounds):
+                    self.background_image = pygame.image.load(
+                        self.backgrounds[self.current_room]
+                    )
+                    self.background_image = pygame.transform.scale(
+                        self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT)
+                    )
 
-            # Déplacement ennemis
-            for enemy in self.enemies:
-                enemy.move()
+                self.spawn_enemy()
+                self.state = "combat"
+                self.enemies_killed = 0
 
-            # Déplacement projectiles
-            for projectile in self.player.projectiles:
-                projectile.move()
+            # =====================
+            # AFFICHAGE
+            # =====================
+            self.screen.blit(self.background_image, (0, 0))
 
-            # Collisions projectiles / ennemis
-            collisions = pygame.sprite.groupcollide(
-                self.player.projectiles,
-                self.enemies,
-                True,
-                True
+            self.screen.blit(
+                self.font.render(f"Score : {self.score}", True, (255, 0, 0)),
+                (10, 10)
             )
-            if collisions:
-                self.score += len(collisions)
 
-            # Collision joueur / ennemis
-            if pygame.sprite.spritecollide(
-                self.player,
-                self.enemies,
-                True
-            ):
-                self.player.take_damage(10)
+            # =====================
+            # INTRO
+            # =====================
+            if self.state == "intro" and not intro_displayed:
+                intro_lines = [
+                    "Bienvenue dans la salle 1",
+                    "Vous devez éliminer 20 ennemis avant de pouvoir",
+                    "répondre à l'énigme et accéder à la salle 2"
+                ]
+                for i, line in enumerate(intro_lines):
+                    text_surface = self.font.render(line, True, (0, 0, 0))  # texte noir
+                    text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, 50 + i * 40))
+                    self.screen.blit(text_surface, text_rect)
+                pygame.display.flip()
+                pygame.time.delay(5000)
+                self.state = "combat"
+                intro_displayed = True
 
-            # Vérifier si joueur est mort
-            if self.player.health <= 0:
-                self.game_over = True
+            # =====================
+            # COMBAT
+            # =====================
+            if self.state == "combat":
+                # Afficher le compteur d'ennemis tués
+                text_surface = self.font.render(
+                    f"Ennemis tués : {self.enemies_killed} / {self.enemies_needed}", True, (0, 0, 0)
+                )
+                text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, 50))
+                self.screen.blit(text_surface, text_rect)
 
-            # Affichage
-            self.screen.blit(self.backgroung_image, (0, 0))
+            # =====================
+            # ÉNIGME
+            # =====================
+            if self.state == "puzzle":
+                # Question
+                question_surface = self.font.render(self.puzzle_question, True, (0, 0, 0))
+                question_rect = question_surface.get_rect(center=(SCREEN_WIDTH // 2, 50))
+                self.screen.blit(question_surface, question_rect)
 
-            # Score
-            score_text = self.font.render(
-                f"Score : {self.score}", True, (255, 0, 0)
-            )
-            self.screen.blit(score_text, (10, 10))
+                # Réponses
+                for i, ans in enumerate(self.puzzle_answers):
+                    ans_surface = self.font.render(ans, True, (0, 0, 0))
+                    ans_rect = ans_surface.get_rect(center=(SCREEN_WIDTH // 2, 100 + i * 40))
+                    self.screen.blit(ans_surface, ans_rect)
 
-            # Joueur et barre de vie
+                # Tentatives restantes
+                attempts_surface = self.font.render(
+                    f"Tentatives restantes : {self.attempts_left}", True, (255, 0, 0)
+                )
+                attempts_rect = attempts_surface.get_rect(center=(SCREEN_WIDTH // 2, 220))
+                self.screen.blit(attempts_surface, attempts_rect)
+
+            # =====================
+            # Joueur et sprites
+            # =====================
             self.screen.blit(self.player.image, self.player.rect)
             self.player.draw_health_bar(self.screen)
-
-            # Ennemi et projectiles
             self.enemies.draw(self.screen)
             self.player.projectiles.draw(self.screen)
+
+            # =====================
+            # GAME OVER
+            # =====================
+            if self.state == "game_over":
+                self.screen.fill((0, 0, 0))
+                self.screen.blit(
+                    self.game_over_font.render("GAME OVER", True, (255, 0, 0)),
+                    (SCREEN_WIDTH // 2 - 180, SCREEN_HEIGHT // 2 - 40)
+                )
 
             pygame.display.flip()
