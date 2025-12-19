@@ -4,6 +4,8 @@ from constants import *
 from player import Player
 from enemy import Enemy
 from enemy_salle2 import EnemySalle2  # Nouveaux ennemis salle 2
+from boss import Boss
+from projectile_boss import ProjectileBoss
 
 class Game:
 
@@ -28,7 +30,7 @@ class Game:
         self.enemies = pygame.sprite.Group()
 
         # États du jeu
-        self.state = "intro"  # intro | combat | puzzle | transition_salle2
+        self.state = "intro"  # intro | combat | puzzle | transition_salle2 | transition_salle3 | combat_boss | victory
         self.game_over = False
 
         # Score
@@ -46,6 +48,11 @@ class Game:
         self.enemies_killed = 0
         self.enemies_needed = 30
         self.wave_active = True
+
+        # Salle 3 (boss)
+        self.boss = None
+        self.boss_projectiles = pygame.sprite.Group()
+        self.boss_defeated = False
 
         # Intro affichée
         self.intro_displayed = False
@@ -87,6 +94,7 @@ class Game:
         self.player.health = self.player.max_health
         self.enemies.empty()
         self.player.projectiles.empty()
+        self.boss_projectiles.empty()
         self.score = 0
         self.state = "intro"
         self.game_over = False
@@ -121,7 +129,7 @@ class Game:
 
                 if event.type == pygame.KEYDOWN:
                     # Saut
-                    if self.state == "combat" and not self.game_over and event.key == pygame.K_UP:
+                    if self.state in ["combat", "combat_boss"] and not self.game_over and event.key == pygame.K_UP:
                         self.player.jump()
 
                     # Énigme
@@ -129,7 +137,10 @@ class Game:
                         if event.key in [pygame.K_1, pygame.K_2, pygame.K_3]:
                             answer = event.key - pygame.K_0
                             if answer == self.correct_answer:
-                                self.state = "transition_salle2"
+                                if self.current_room == 0:
+                                    self.state = "transition_salle2"
+                                elif self.current_room == 1:
+                                    self.state = "transition_salle3"
                             else:
                                 self.attempts_left -= 1
                                 if self.attempts_left <= 0:
@@ -142,7 +153,7 @@ class Game:
                         self.reset_game()
 
                 # Tir souris
-                if event.type == pygame.MOUSEBUTTONDOWN and self.state == "combat" and not self.game_over:
+                if event.type == pygame.MOUSEBUTTONDOWN and self.state in ["combat", "combat_boss"] and not self.game_over:
                     if event.button == 1:
                         self.player.shoot()
 
@@ -155,9 +166,8 @@ class Game:
             # Transition salle 2
             # =====================
             if self.state == "transition_salle2":
-                # Ajuster la position du sol pour salle 2
                 global GAME_FLOOR
-                GAME_FLOOR = 500  # adapte selon ta salle 2
+                GAME_FLOOR = 500
 
                 countdown = 3
                 font_big = pygame.font.Font(None, 60)
@@ -176,8 +186,6 @@ class Game:
                 self.current_room = 1
                 self.background_image = pygame.image.load(self.backgrounds[self.current_room])
                 self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
-
-                # Ennemis salle 2
                 self.enemies.empty()
                 self.spawn_enemy()
 
@@ -186,23 +194,29 @@ class Game:
 
                 # Nombre d'ennemis à tuer pour salle 2
                 self.enemies_needed = 15
-
-                # Revenir à l'état combat
                 self.state = "combat"
                 self.enemies_killed = 0
                 self.wave_active = True
 
-                # Mettre le joueur plus bas dans la salle 2
+            # =====================
+            # Transition salle 3 (boss)
+            # =====================
+            if self.state == "transition_salle3":
+                GAME_FLOOR = 500  # sol boss
                 self.player.rect.y = GAME_FLOOR - self.player.rect.height
 
-                # Nombre d'ennemis à tuer pour la salle 2
-                self.enemies_needed = 15
+                # Charger salle 3
+                self.current_room = 2
+                self.backgrounds.append("assets/images/background_room3.jpg")
+                self.background_image = pygame.image.load(self.backgrounds[self.current_room])
+                self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
 
-                # Revenir à l'état combat
-                self.state = "combat"
-                self.enemies_killed = 0
-                self.wave_active = True
+                # Créer le boss
+                self.boss = Boss(SCREEN_WIDTH//2, GAME_FLOOR - 150)
+                self.boss_projectiles.empty()
 
+                # Passer en état combat boss
+                self.state = "combat_boss"
 
             # =====================
             # LOGIQUE COMBAT
@@ -243,6 +257,38 @@ class Game:
                     self.wave_active = False
 
             # =====================
+            # LOGIQUE COMBAT BOSS
+            # =====================
+            if self.state == "combat_boss" and not self.game_over:
+                self.player.apply_gravity()
+
+                # Déplacement boss et tir
+                if self.boss:
+                    self.boss.move()
+                    projectile = self.boss.shoot(self.player.rect.center)
+                    if projectile:
+                        self.boss_projectiles.add(projectile)
+
+                # Déplacer projectiles boss
+                for proj in self.boss_projectiles:
+                    proj.move()
+
+                # Collision joueur/projectiles boss
+                if pygame.sprite.spritecollide(self.player, self.boss_projectiles, True):
+                    self.player.take_damage(20)
+
+                # Collision projectiles joueur/boss
+                if self.boss:
+                    collisions = pygame.sprite.spritecollide(self.boss, self.player.projectiles, True)
+                    for _ in collisions:
+                        self.boss.take_damage(10)
+                        if self.boss.health <= 0:
+                            self.boss.kill()
+                            self.boss = None
+                            self.boss_defeated = True
+                            self.state = "victory"
+
+            # =====================
             # AFFICHAGE
             # =====================
             self.screen.blit(self.background_image, (0, 0))
@@ -267,52 +313,55 @@ class Game:
                 self.intro_displayed = True
 
             # =====================
-            # COMBAT
+            # COMBAT & AFFICHAGE ENNEMIS
             # =====================
-            if self.state == "combat" and not self.game_over:
+            if self.state in ["combat", "combat_boss"] and not self.game_over:
                 color = (255, 255, 255) if self.current_room == 1 else (0, 0, 0)
-                text_surface = self.font.render(
-                    f"Ennemis tués : {self.enemies_killed} / {self.enemies_needed}", True, color
-                )
-                text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, 50))
-                self.screen.blit(text_surface, text_rect)
+                if self.state == "combat":
+                    text_surface = self.font.render(
+                        f"Ennemis tués : {self.enemies_killed} / {self.enemies_needed}", True, color
+                    )
+                    text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, 50))
+                    self.screen.blit(text_surface, text_rect)
 
             # =====================
             # ÉNIGME
             # =====================
             if self.state == "puzzle" and not self.game_over:
-                # Couleur : blanc si salle 2, noir sinon
                 color = (255, 255, 255) if self.current_room == 1 else (0, 0, 0)
-
-                # Question
                 question_surface = self.font.render(self.puzzle_question, True, color)
                 question_rect = question_surface.get_rect(center=(SCREEN_WIDTH // 2, 50))
                 self.screen.blit(question_surface, question_rect)
-
-                # Réponses
                 for i, ans in enumerate(self.puzzle_answers):
                     ans_surface = self.font.render(ans, True, color)
                     ans_rect = ans_surface.get_rect(center=(SCREEN_WIDTH // 2, 100 + i * 40))
                     self.screen.blit(ans_surface, ans_rect)
-
-                # Tentatives restantes (toujours en rouge)
                 attempts_surface = self.font.render(f"Tentatives restantes : {self.attempts_left}", True, (255, 0, 0))
                 attempts_rect = attempts_surface.get_rect(center=(SCREEN_WIDTH // 2, 220))
                 self.screen.blit(attempts_surface, attempts_rect)
-
 
             # =====================
             # Joueur et sprites
             # =====================
             self.screen.blit(self.player.image, self.player.rect)
             self.player.draw_health_bar(self.screen)
-
             for enemy in self.enemies:
                 self.screen.blit(enemy.image, enemy.rect)
                 if hasattr(enemy, 'draw_health_bar'):
                     enemy.draw_health_bar(self.screen)
-
             self.player.projectiles.draw(self.screen)
+            self.boss_projectiles.draw(self.screen)
+
+            if self.boss:
+                self.boss.draw_health_bar(self.screen)
+
+            # =====================
+            # VICTOIRE BOSS
+            # =====================
+            if self.state == "victory":
+                self.screen.fill((0, 0, 0))
+                victory_text = self.font.render("BRAVO ! Vous avez vaincu le boss !", True, (255, 255, 255))
+                self.screen.blit(victory_text, victory_text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2)))
 
             # =====================
             # GAME OVER
