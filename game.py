@@ -17,7 +17,7 @@ class Game:
         # Décors par salle
         self.backgrounds = [
             "assets/images/background_room1.jpg",
-            "assets/images/background_room2.jpg"
+            "assets/images/background_room2.jpg",
         ]
         self.current_room = 0
         self.background_image = pygame.image.load(self.backgrounds[self.current_room])
@@ -111,6 +111,7 @@ class Game:
     # Boucle principale
     # =====================
     def run(self):
+        global GAME_FLOOR
         clock = pygame.time.Clock()
         SPAWN_ENEMY_EVENT = pygame.USEREVENT + 1
         pygame.time.set_timer(SPAWN_ENEMY_EVENT, 2000)
@@ -166,7 +167,6 @@ class Game:
             # Transition salle 2
             # =====================
             if self.state == "transition_salle2":
-                global GAME_FLOOR
                 GAME_FLOOR = 500
 
                 countdown = 3
@@ -192,6 +192,9 @@ class Game:
                 # Mettre le joueur plus bas
                 self.player.rect.y = GAME_FLOOR - self.player.rect.height
 
+                # Réinitialiser la vie du joueur
+                self.player.health = self.player.max_health
+
                 # Nombre d'ennemis à tuer pour salle 2
                 self.enemies_needed = 15
                 self.state = "combat"
@@ -202,20 +205,46 @@ class Game:
             # Transition salle 3 (boss)
             # =====================
             if self.state == "transition_salle3":
-                GAME_FLOOR = 500  # sol boss
-                self.player.rect.y = GAME_FLOOR - self.player.rect.height
+                GAME_FLOOR = 500
+
+                countdown = 3
+                font_big = pygame.font.Font(None, 60)
+                font_small = pygame.font.Font(None, 40)
+
+                for i in range(countdown, 0, -1):
+                    self.screen.fill((0, 0, 0))
+                    msg1 = font_big.render(
+                        "Bravo, vous avez réussi la salle 2 !", True, (255, 255, 255)
+                    )
+                    msg2 = font_small.render(
+                        f"Le boss arrive dans {i}...", True, (255, 255, 255)
+                    )
+                    self.screen.blit(
+                        msg1, msg1.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 - 30))
+                    )
+                    self.screen.blit(
+                        msg2, msg2.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 + 30))
+                    )
+                    pygame.display.flip()
+                    pygame.time.delay(1000)
 
                 # Charger salle 3
                 self.current_room = 2
                 self.backgrounds.append("assets/images/background_room3.jpg")
                 self.background_image = pygame.image.load(self.backgrounds[self.current_room])
-                self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+                self.background_image = pygame.transform.scale(
+                    self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT)
+                )
+
+                # Position joueur + vie
+                self.player.rect.y = GAME_FLOOR - self.player.rect.height
+                self.player.health = self.player.max_health
 
                 # Créer le boss
-                self.boss = Boss(SCREEN_WIDTH//2, GAME_FLOOR - 150)
+                self.boss = Boss(SCREEN_WIDTH // 2, GAME_FLOOR - 150)
                 self.boss_projectiles.empty()
 
-                # Passer en état combat boss
+                # Combat boss
                 self.state = "combat_boss"
 
             # =====================
@@ -353,6 +382,7 @@ class Game:
             self.boss_projectiles.draw(self.screen)
 
             if self.boss:
+                self.screen.blit(self.boss.image, self.boss.rect)
                 self.boss.draw_health_bar(self.screen)
 
             # =====================
