@@ -13,8 +13,13 @@ class Player(pygame.sprite.Sprite):
             self.image, (PLAYER_WIDTH, PLAYER_HEIGHT)
         )
         self.rect = self.image.get_rect()
+        
+        # --- MODIFICATION ---
+        # On définit le sol actuel du joueur (initialisé avec la constante par défaut)
+        self.floor_y = GAME_FLOOR
+        
         self.rect.x = 100
-        self.rect.y = GAME_FLOOR
+        self.rect.y = self.floor_y
 
         # Déplacement
         self.speed = 5
@@ -47,34 +52,28 @@ class Player(pygame.sprite.Sprite):
         self.velocity_y += GRAVITY
         self.rect.y += self.velocity_y
 
-        if self.rect.y >= GAME_FLOOR:
-            self.rect.y = GAME_FLOOR
+        # --- MODIFICATION ---
+        # On utilise self.floor_y au lieu de la constante globale GAME_FLOOR
+        if self.rect.y >= self.floor_y:
+            self.rect.y = self.floor_y
             self.velocity_y = 0
             self.on_ground = True
 
     # Tir avec option verticale
     def shoot(self, target=None, target_y=None):
-        """
-        Crée un projectile.
-        target : un objet avec un rect (ex: Boss) ou None pour tir droit.
-        target_y : coordonnée Y pour tir vertical (salle 3)
-        """
         if target_y is not None:
-            # Tir vertical vers target_y
             projectile = Projectile(
                 self.rect.centerx,
                 self.rect.top,
                 target_pos=(self.rect.centerx, target_y)
             )
         elif target:
-            # Tir vers un ennemi ou boss
             projectile = Projectile(
                 self.rect.centerx,
                 self.rect.centery,
                 target_pos=(target.rect.centerx, target.rect.centery)
             )
         else:
-            # Tir droit horizontal
             projectile = Projectile(
                 self.rect.right,
                 self.rect.centery
@@ -82,29 +81,22 @@ class Player(pygame.sprite.Sprite):
         self.projectiles.add(projectile)
 
 
-    # ❤️ Prendre des dégâts
     def take_damage(self, amount):
         self.health -= amount
         if self.health < 0:
             self.health = 0
 
-    # ❤️ Dessiner la barre de vie avec texte PV
     def draw_health_bar(self, screen):
         bar_width = 80
         bar_height = 8
 
-        # Position au-dessus du joueur
         x = self.rect.x + 10
-        y = self.rect.y - 25  # un peu plus haut pour le texte
+        y = self.rect.y - 25
 
-        # Fond rouge
         pygame.draw.rect(screen, (255, 0, 0), (x, y, bar_width, bar_height))
-
-        # Barre verte (vie restante)
         health_ratio = self.health / self.max_health
         pygame.draw.rect(screen, (0, 255, 0), (x, y, bar_width * health_ratio, bar_height))
 
-        # Afficher le texte des PV
         health_text = pygame.font.Font(None, 20).render(
             f"{self.health} / {self.max_health} PV", True, (0, 0, 0)
         )

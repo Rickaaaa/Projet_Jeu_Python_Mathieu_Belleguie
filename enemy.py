@@ -14,7 +14,5 @@ class Enemy(pygame.sprite.Sprite):
 
     def move(self):
         self.rect.x -= self.speed
-
-        # Supprimer l'ennemi s'il sort de l'écran
         if self.rect.right < 0:
             self.kill()

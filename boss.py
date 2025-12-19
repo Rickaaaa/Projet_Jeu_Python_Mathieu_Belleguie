@@ -1,43 +1,29 @@
 import pygame
 import random
 from constants import *
-from projectile import Projectile  # On utilise le projectile classique
+from projectile import Projectile
 
 class Boss(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
-
-        # Image
         self.image = pygame.image.load("assets/images/boss.png").convert_alpha()
         self.image = pygame.transform.scale(self.image, (150, 150))
         self.rect = self.image.get_rect(midbottom=(x, y))
 
-        # Vie
         self.max_health = 300
         self.health = 300
-
-        # Déplacement
         self.speed = 2
-        self.direction = 1  # 1 = droite, -1 = gauche
+        self.direction = 1 
 
-        # États du boss
-        self.state = "move"  # move | shoot
+        self.state = "move"
         self.state_timer = 180
-
-        # Tir
         self.shoot_cooldown = 90
         self.shoot_timer = 0
-
-        # Tir en rafale
         self.shots_left = 0
         self.rapid_fire_delay = 15
         self.rapid_fire_timer = 0
 
-    # =====================
-    # Déplacement + logique boss
-    # =====================
     def move(self):
-        # Gestion des états
         self.state_timer -= 1
         if self.state_timer <= 0:
             if self.state == "move":
@@ -48,7 +34,6 @@ class Boss(pygame.sprite.Sprite):
                 self.state = "move"
                 self.state_timer = 180
 
-        # Déplacement seulement en état MOVE
         if self.state == "move":
             self.rect.x += self.speed * self.direction
             if self.rect.right >= SCREEN_WIDTH - 50:
@@ -56,16 +41,12 @@ class Boss(pygame.sprite.Sprite):
             elif self.rect.left <= 50:
                 self.direction = 1
 
-        # Timers
         if self.shoot_timer > 0:
             self.shoot_timer -= 1
 
         if self.rapid_fire_timer > 0:
             self.rapid_fire_timer -= 1
 
-    # =====================
-    # Tir du boss
-    # =====================
     def shoot(self, player_pos):
         if self.state != "shoot":
             return None
@@ -73,22 +54,15 @@ class Boss(pygame.sprite.Sprite):
         if self.shots_left > 0 and self.rapid_fire_timer <= 0:
             self.rapid_fire_timer = self.rapid_fire_delay
             self.shots_left -= 1
-            # Crée un projectile classique vers le joueur
             return Projectile(self.rect.centerx, self.rect.centery, target_pos=player_pos)
 
         return None
 
-    # =====================
-    # Dégâts
-    # =====================
     def take_damage(self, amount):
         self.health -= amount
         if self.health < 0:
             self.health = 0
 
-    # =====================
-    # Barre de vie
-    # =====================
     def draw_health_bar(self, screen):
         bar_width = 100
         bar_height = 10

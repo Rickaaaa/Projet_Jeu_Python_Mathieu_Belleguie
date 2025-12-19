@@ -3,14 +3,13 @@ import random
 from constants import *
 from player import Player
 from enemy import Enemy
-from enemy_salle2 import EnemySalle2  # Nouveaux ennemis salle 2
+from enemy_salle2 import EnemySalle2
 from boss import Boss
 from projectile import Projectile
 
 class Game:
 
     def __init__(self):
-        # Fenêtre
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Ruines Mythologiques")
 
@@ -23,14 +22,21 @@ class Game:
         self.background_image = pygame.image.load(self.backgrounds[self.current_room])
         self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
 
+        # --- MODIFICATION ---
+        # Variable pour gérer la hauteur du sol selon la salle
+        self.level_floor = GAME_FLOOR
+
         # Joueur
         self.player = Player()
+        # On s'assure que le joueur connait le sol actuel
+        self.player.floor_y = self.level_floor 
+        self.player.rect.y = self.level_floor
 
         # Ennemis
         self.enemies = pygame.sprite.Group()
 
         # États du jeu
-        self.state = "intro"  # intro | combat | puzzle | transition_salle2 | transition_salle3 | combat_boss | victory
+        self.state = "intro" 
         self.game_over = False
 
         # Score
@@ -54,22 +60,21 @@ class Game:
         self.boss_projectiles = pygame.sprite.Group()
         self.boss_defeated = False
 
-        # Intro affichée
         self.intro_displayed = False
-
-        # Lancer la première vague
         self.spawn_enemy()
-
-        # Boucle principale
         self.running = True
 
     # =====================
-    # Spawn ennemis selon la salle
+    # Spawn ennemis
     # =====================
     def spawn_enemy(self):
         for _ in range(random.randint(2, 4)):
             x = SCREEN_WIDTH + random.randint(0, 300)
-            y = GAME_FLOOR - random.randint(0, 120)
+            
+            # --- MODIFICATION ---
+            # Les ennemis apparaissent par rapport au sol actuel (level_floor)
+            y = self.level_floor - random.randint(0, 120)
+            
             if self.current_room == 0:
                 self.enemies.add(Enemy(x, y))
             else:
@@ -87,10 +92,14 @@ class Game:
             self.player.move_left()
 
     # =====================
-    # Reset complet du jeu
+    # Reset complet
     # =====================
     def reset_game(self):
+        # On remet le sol par défaut pour la salle 1
+        self.level_floor = GAME_FLOOR
         self.player = Player()
+        self.player.floor_y = self.level_floor
+        
         self.player.health = self.player.max_health
         self.enemies.empty()
         self.player.projectiles.empty()
@@ -111,7 +120,6 @@ class Game:
     # Boucle principale
     # =====================
     def run(self):
-        global GAME_FLOOR
         clock = pygame.time.Clock()
         SPAWN_ENEMY_EVENT = pygame.USEREVENT + 1
         pygame.time.set_timer(SPAWN_ENEMY_EVENT, 2000)
@@ -120,9 +128,6 @@ class Game:
             clock.tick(60)
             self.keyboard()
 
-            # =====================
-            # Événements
-            # =====================
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
@@ -149,21 +154,19 @@ class Game:
                                     self.state = "combat"
                                     self.spawn_enemy()
 
-                    # Rejouer après Game Over
+                    # Rejouer
                     if self.game_over and event.key == pygame.K_RETURN:
                         self.reset_game()
 
-                # Tir souris
+                # Tir
                 if event.type == pygame.MOUSEBUTTONDOWN and self.state in ["combat", "combat_boss"] and not self.game_over:
                     if event.button == 1:
                         if self.current_room == 2:
-                            # Tir vertical dans la salle du boss
                             self.player.shoot(target_y=0)
                         else:
-                            # Tir droit classique
                             self.player.shoot()
 
-                # Spawn ennemis
+                # Spawn
                 if event.type == SPAWN_ENEMY_EVENT and self.state == "combat" and not self.game_over and self.wave_active:
                     if len(self.enemies) < 4:
                         self.spawn_enemy()
@@ -172,7 +175,6 @@ class Game:
             # Transition salle 2
             # =====================
             if self.state == "transition_salle2":
-                GAME_FLOOR = 500
                 countdown = 3
                 font_big = pygame.font.Font(None, 60)
                 font_small = pygame.font.Font(None, 40)
@@ -187,11 +189,19 @@ class Game:
 
                 # Charger salle 2
                 self.current_room = 1
+                
+                # --- MODIFICATION ---
+                # On change le sol pour la salle 2 (plus bas = valeur Y plus grande)
+                self.level_floor = 580 
+                # On met à jour le joueur
+                self.player.floor_y = self.level_floor
+                self.player.rect.y = self.player.floor_y - self.player.rect.height
+                
                 self.background_image = pygame.image.load(self.backgrounds[self.current_room])
                 self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
                 self.enemies.empty()
                 self.spawn_enemy()
-                self.player.rect.y = GAME_FLOOR - self.player.rect.height
+                
                 self.player.health = self.player.max_health
                 self.enemies_needed = 15
                 self.state = "combat"
@@ -202,7 +212,6 @@ class Game:
             # Transition salle 3 (boss)
             # =====================
             if self.state == "transition_salle3":
-                GAME_FLOOR = 500
                 countdown = 3
                 font_big = pygame.font.Font(None, 60)
                 font_small = pygame.font.Font(None, 40)
@@ -220,14 +229,18 @@ class Game:
                 self.backgrounds.append("assets/images/background_room3.jpg")
                 self.background_image = pygame.image.load(self.backgrounds[self.current_room])
                 self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
-                self.player.rect.y = GAME_FLOOR - self.player.rect.height
+                
+                # --- MODIFICATION ---
+                # Retour au sol normal pour le Boss (ou autre valeur si tu veux)
+                self.level_floor = GAME_FLOOR 
+                self.player.floor_y = self.level_floor
+                self.player.rect.y = self.player.floor_y - self.player.rect.height
                 self.player.health = self.player.max_health
 
-                # Créer le boss
-                self.boss = Boss(SCREEN_WIDTH // 2, GAME_FLOOR - 150)
+                # Créer le boss en utilisant le bon niveau de sol
+                self.boss = Boss(SCREEN_WIDTH // 2, self.level_floor - 150)
                 self.boss_projectiles.empty()
 
-                # Combat boss
                 self.state = "combat_boss"
 
             # =====================
@@ -240,7 +253,6 @@ class Game:
                 for projectile in self.player.projectiles:
                     projectile.move()
 
-                # Collisions projectiles / ennemis
                 collisions = pygame.sprite.groupcollide(self.player.projectiles, self.enemies, True, False)
                 for projectile, enemies_hit in collisions.items():
                     for enemy in enemies_hit:
@@ -255,7 +267,6 @@ class Game:
                             self.score += 1
                             self.enemies_killed += 1
 
-                # Collision joueur / ennemis
                 if pygame.sprite.spritecollide(self.player, self.enemies, True):
                     self.player.take_damage(20)
 
@@ -267,7 +278,7 @@ class Game:
                     self.wave_active = False
 
             # =====================
-            # LOGIQUE COMBAT BOSS
+            # LOGIQUE BOSS
             # =====================
             if self.state == "combat_boss" and not self.game_over:
                 self.player.apply_gravity()
@@ -302,7 +313,6 @@ class Game:
             self.screen.blit(self.background_image, (0, 0))
             self.screen.blit(self.font.render(f"Score : {self.score}", True, (255, 0, 0)), (10, 10))
 
-            # INTRO
             if self.state == "intro" and not self.intro_displayed:
                 intro_lines = [
                     "Bienvenue dans la salle 1",
@@ -318,7 +328,6 @@ class Game:
                 self.state = "combat"
                 self.intro_displayed = True
 
-            # COMBAT & AFFICHAGE ENNEMIS
             if self.state in ["combat", "combat_boss"] and not self.game_over:
                 color = (255, 255, 255) if self.current_room == 1 else (0, 0, 0)
                 if self.state == "combat":
@@ -328,7 +337,6 @@ class Game:
                     text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, 50))
                     self.screen.blit(text_surface, text_rect)
 
-            # ÉNIGME
             if self.state == "puzzle" and not self.game_over:
                 color = (255, 255, 255) if self.current_room == 1 else (0, 0, 0)
                 question_surface = self.font.render(self.puzzle_question, True, color)
@@ -342,7 +350,6 @@ class Game:
                 attempts_rect = attempts_surface.get_rect(center=(SCREEN_WIDTH // 2, 220))
                 self.screen.blit(attempts_surface, attempts_rect)
 
-            # Joueur et sprites
             self.screen.blit(self.player.image, self.player.rect)
             self.player.draw_health_bar(self.screen)
             for enemy in self.enemies:
@@ -356,13 +363,11 @@ class Game:
                 self.screen.blit(self.boss.image, self.boss.rect)
                 self.boss.draw_health_bar(self.screen)
 
-            # VICTOIRE BOSS
             if self.state == "victory":
                 self.screen.fill((0, 0, 0))
                 victory_text = self.font.render("BRAVO ! Vous avez vaincu le boss !", True, (255, 255, 255))
                 self.screen.blit(victory_text, victory_text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2)))
 
-            # GAME OVER
             if self.game_over:
                 self.screen.fill((0, 0, 0))
                 self.screen.blit(

@@ -5,18 +5,14 @@ import os
 class EnemySalle2(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
-        # Charger l'image de l'ennemi
         self.image = pygame.image.load(os.path.join("assets/images/enemy2.png")).convert_alpha()
-        self.image = pygame.transform.scale(self.image, (50, 50))  # adapter la taille si nécessaire
+        self.image = pygame.transform.scale(self.image, (50, 50)) 
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
 
-        # Barre de vie
         self.max_health = 100
         self.health = self.max_health
-
-        # Vitesse
         self.speed = 2
 
     def move(self):
