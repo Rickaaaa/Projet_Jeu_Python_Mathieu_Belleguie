@@ -22,13 +22,12 @@ class Game:
         self.background_image = pygame.image.load(self.backgrounds[self.current_room])
         self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
 
-        # --- MODIFICATION ---
-        # Variable pour gérer la hauteur du sol selon la salle
+        # --- GESTION DU SOL ---
+        # Salle 1 (défaut) : Le sol est à 500
         self.level_floor = GAME_FLOOR
 
         # Joueur
         self.player = Player()
-        # On s'assure que le joueur connait le sol actuel
         self.player.floor_y = self.level_floor 
         self.player.rect.y = self.level_floor
 
@@ -44,11 +43,14 @@ class Game:
         self.font = pygame.font.Font(None, 32)
         self.game_over_font = pygame.font.Font(None, 80)
 
-        # Énigme salle 1
+        # Énigme
         self.puzzle_question = "Quel dieu gardait les temples ?"
         self.puzzle_answers = ["1. Anubis", "2. Zeus", "3. Hadès"]
         self.correct_answer = 1
-        self.attempts_left = 3
+        
+        # --- MODIFICATION ---
+        # On passe à 2 tentatives pour éviter le "brute force"
+        self.attempts_left = 2
 
         # Vagues
         self.enemies_killed = 0
@@ -71,8 +73,7 @@ class Game:
         for _ in range(random.randint(2, 4)):
             x = SCREEN_WIDTH + random.randint(0, 300)
             
-            # --- MODIFICATION ---
-            # Les ennemis apparaissent par rapport au sol actuel (level_floor)
+            # Les ennemis apparaissent sur le sol actuel
             y = self.level_floor - random.randint(0, 120)
             
             if self.current_room == 0:
@@ -95,12 +96,13 @@ class Game:
     # Reset complet
     # =====================
     def reset_game(self):
-        # On remet le sol par défaut pour la salle 1
+        # Reset au sol par défaut (Salle 1)
         self.level_floor = GAME_FLOOR
+        
         self.player = Player()
         self.player.floor_y = self.level_floor
-        
         self.player.health = self.player.max_health
+        
         self.enemies.empty()
         self.player.projectiles.empty()
         self.boss_projectiles.empty()
@@ -108,10 +110,20 @@ class Game:
         self.state = "intro"
         self.game_over = False
         self.current_room = 0
-        self.attempts_left = 3
+        
+        # --- MODIFICATION ---
+        # Reset à 2 tentatives
+        self.attempts_left = 2
+        
         self.wave_active = True
         self.enemies_killed = 0
         self.intro_displayed = False
+        
+        # Reset question Salle 1
+        self.puzzle_question = "Quel dieu gardait les temples ?"
+        self.puzzle_answers = ["1. Anubis", "2. Zeus", "3. Hadès"]
+        self.correct_answer = 1
+        
         self.background_image = pygame.image.load(self.backgrounds[self.current_room])
         self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
         self.spawn_enemy()
@@ -134,11 +146,9 @@ class Game:
                     self.running = False
 
                 if event.type == pygame.KEYDOWN:
-                    # Saut
                     if self.state in ["combat", "combat_boss"] and not self.game_over and event.key == pygame.K_UP:
                         self.player.jump()
 
-                    # Énigme
                     if self.state == "puzzle" and not self.game_over:
                         if event.key in [pygame.K_1, pygame.K_2, pygame.K_3]:
                             answer = event.key - pygame.K_0
@@ -150,15 +160,15 @@ class Game:
                             else:
                                 self.attempts_left -= 1
                                 if self.attempts_left <= 0:
-                                    self.attempts_left = 3
+                                    # --- MODIFICATION ---
+                                    # Si on rate, on remet à 2 tentatives pour la prochaine fois
+                                    self.attempts_left = 2
                                     self.state = "combat"
                                     self.spawn_enemy()
 
-                    # Rejouer
                     if self.game_over and event.key == pygame.K_RETURN:
                         self.reset_game()
 
-                # Tir
                 if event.type == pygame.MOUSEBUTTONDOWN and self.state in ["combat", "combat_boss"] and not self.game_over:
                     if event.button == 1:
                         if self.current_room == 2:
@@ -166,7 +176,6 @@ class Game:
                         else:
                             self.player.shoot()
 
-                # Spawn
                 if event.type == SPAWN_ENEMY_EVENT and self.state == "combat" and not self.game_over and self.wave_active:
                     if len(self.enemies) < 4:
                         self.spawn_enemy()
@@ -187,13 +196,11 @@ class Game:
                     pygame.display.flip()
                     pygame.time.delay(1000)
 
-                # Charger salle 2
                 self.current_room = 1
                 
-                # --- MODIFICATION ---
-                # On change le sol pour la salle 2 (plus bas = valeur Y plus grande)
-                self.level_floor = 580 
-                # On met à jour le joueur
+                # --- HAUTEUR SALLE 2 (Ta valeur : 530) ---
+                self.level_floor = 530  
+                
                 self.player.floor_y = self.level_floor
                 self.player.rect.y = self.player.floor_y - self.player.rect.height
                 
@@ -224,20 +231,18 @@ class Game:
                     pygame.display.flip()
                     pygame.time.delay(1000)
 
-                # Charger salle 3
                 self.current_room = 2
                 self.backgrounds.append("assets/images/background_room3.jpg")
                 self.background_image = pygame.image.load(self.backgrounds[self.current_room])
                 self.background_image = pygame.transform.scale(self.background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
                 
-                # --- MODIFICATION ---
-                # Retour au sol normal pour le Boss (ou autre valeur si tu veux)
-                self.level_floor = GAME_FLOOR 
+                # --- HAUTEUR SALLE 3 (Ta valeur : 550) ---
+                self.level_floor = 550  
+                
                 self.player.floor_y = self.level_floor
                 self.player.rect.y = self.player.floor_y - self.player.rect.height
                 self.player.health = self.player.max_health
 
-                # Créer le boss en utilisant le bon niveau de sol
                 self.boss = Boss(SCREEN_WIDTH // 2, self.level_floor - 150)
                 self.boss_projectiles.empty()
 
@@ -277,11 +282,27 @@ class Game:
                     self.state = "puzzle"
                     self.wave_active = False
 
+                    # Questions
+                    if self.current_room == 0:
+                        self.puzzle_question = "Quel dieu gardait les temples ?"
+                        self.puzzle_answers = ["1. Anubis", "2. Zeus", "3. Hadès"]
+                        self.correct_answer = 1
+                    elif self.current_room == 1:
+                        self.puzzle_question = "A quoi servaient les pyramides ?"
+                        self.puzzle_answers = ["1. Maisons", "2. Tombeaux", "3. Greniers"]
+                        self.correct_answer = 2
+
             # =====================
             # LOGIQUE BOSS
             # =====================
             if self.state == "combat_boss" and not self.game_over:
                 self.player.apply_gravity()
+                
+                # --- CORRECTION : AJOUTE CES 2 LIGNES ICI ---
+                for projectile in self.player.projectiles:
+                    projectile.move()
+                # ---------------------------------------------
+
                 if self.boss:
                     self.boss.move()
                     projectile = self.boss.shoot(self.player.rect.center)
@@ -290,22 +311,10 @@ class Game:
 
                 for proj in self.boss_projectiles:
                     proj.move()
-
+                
+                # ... (la suite reste la même : collisions, etc.)
                 if pygame.sprite.spritecollide(self.player, self.boss_projectiles, True):
                     self.player.take_damage(20)
-
-                if self.boss:
-                    collisions = pygame.sprite.spritecollide(self.boss, self.player.projectiles, True)
-                    for _ in collisions:
-                        self.boss.take_damage(10)
-                        if self.boss.health <= 0:
-                            self.boss.kill()
-                            self.boss = None
-                            self.boss_defeated = True
-                            self.state = "victory"
-
-                if self.player.health <= 0:
-                    self.game_over = True
 
             # =====================
             # AFFICHAGE

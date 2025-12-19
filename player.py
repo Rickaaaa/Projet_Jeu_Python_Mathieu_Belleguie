@@ -14,8 +14,7 @@ class Player(pygame.sprite.Sprite):
         )
         self.rect = self.image.get_rect()
         
-        # --- MODIFICATION ---
-        # On définit le sol actuel du joueur (initialisé avec la constante par défaut)
+        # Sol
         self.floor_y = GAME_FLOOR
         
         self.rect.x = 100
@@ -52,28 +51,34 @@ class Player(pygame.sprite.Sprite):
         self.velocity_y += GRAVITY
         self.rect.y += self.velocity_y
 
-        # --- MODIFICATION ---
-        # On utilise self.floor_y au lieu de la constante globale GAME_FLOOR
         if self.rect.y >= self.floor_y:
             self.rect.y = self.floor_y
             self.velocity_y = 0
             self.on_ground = True
 
-    # Tir avec option verticale
+    # --- CORRECTION DE LA MÉTHODE SHOOT ---
     def shoot(self, target=None, target_y=None):
+        """
+        Crée un projectile.
+        target : un objet avec un rect (ex: Boss) ou None pour tir droit.
+        target_y : coordonnée Y pour tir vertical (salle 3)
+        """
         if target_y is not None:
+            # CORRECTION : On active explicitement le mode vertical=True
             projectile = Projectile(
                 self.rect.centerx,
                 self.rect.top,
-                target_pos=(self.rect.centerx, target_y)
+                vertical=True
             )
         elif target:
+            # Tir ciblé (si besoin plus tard)
             projectile = Projectile(
                 self.rect.centerx,
                 self.rect.centery,
                 target_pos=(target.rect.centerx, target.rect.centery)
             )
         else:
+            # Tir droit horizontal classique
             projectile = Projectile(
                 self.rect.right,
                 self.rect.centery
