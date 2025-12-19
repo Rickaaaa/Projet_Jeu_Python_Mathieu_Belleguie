@@ -221,7 +221,8 @@ class Game:
             # TRANSITIONS
             # =====================
             if self.state == "transition_salle2":
-                countdown = 3
+                # 1. Compte à rebours
+                countdown = 10
                 font_big = pygame.font.Font(None, 60)
                 font_small = pygame.font.Font(None, 40)
                 for i in range(countdown, 0, -1):
@@ -233,6 +234,7 @@ class Game:
                     pygame.display.flip()
                     pygame.time.delay(1000)
 
+                # 2. Chargement Salle 2
                 self.current_room = 1
                 self.level_floor = 530  
                 self.player.floor_y = self.level_floor
@@ -243,12 +245,43 @@ class Game:
                 self.spawn_enemy()
                 self.player.health = self.player.max_health
                 self.enemies_needed = 15
-                self.state = "combat"
                 self.enemies_killed = 0
                 self.wave_active = True
 
+                # 3. Intro Texte Salle 2
+                self.screen.blit(self.background_image, (0, 0))
+                self.screen.blit(self.player.image, self.player.rect)
+                for enemy in self.enemies:
+                    self.screen.blit(enemy.image, enemy.rect)
+
+                intro_lines_2 = [
+                    "Bienvenue dans la salle 2...",
+                    "Les gardiens antiques vous attendent.",
+                    "Eliminez 15 ennemis",
+                    "pour affronter le Boss Final."
+                ]
+                text_color = (255, 215, 0)
+                bg_color = (0, 0, 0, 180)
+                start_y = 120
+                line_spacing = 50
+                total_height = len(intro_lines_2) * line_spacing + 40
+                
+                bg_surface = pygame.Surface((SCREEN_WIDTH, total_height), pygame.SRCALPHA)
+                bg_surface.fill(bg_color)
+                self.screen.blit(bg_surface, (0, start_y - 20))
+
+                for i, line in enumerate(intro_lines_2):
+                    text_surf = self.font_subtitle.render(line, True, text_color)
+                    rect = text_surf.get_rect(center=(SCREEN_WIDTH // 2, start_y + i * line_spacing))
+                    self.screen.blit(text_surf, rect)
+
+                pygame.display.flip()
+                pygame.time.delay(8000)
+                self.state = "combat"
+
             if self.state == "transition_salle3":
-                countdown = 3
+                # 1. Compte à rebours
+                countdown = 10
                 font_big = pygame.font.Font(None, 60)
                 font_small = pygame.font.Font(None, 40)
                 for i in range(countdown, 0, -1):
@@ -260,6 +293,7 @@ class Game:
                     pygame.display.flip()
                     pygame.time.delay(1000)
 
+                # 2. Chargement Salle 3 (Boss)
                 self.current_room = 2
                 self.backgrounds.append("assets/images/background_room3.jpg")
                 self.background_image = pygame.image.load(self.backgrounds[self.current_room])
@@ -269,8 +303,43 @@ class Game:
                 self.player.rect.y = self.player.floor_y - self.player.rect.height
                 self.player.health = self.player.max_health
                 self.enemies.empty()
+                
+                # Création du Boss
                 self.boss = Boss(SCREEN_WIDTH // 2, self.level_floor - 150)
                 self.boss_projectiles.empty()
+
+                # 3. Intro Texte BOSS (NOUVEAU)
+                self.screen.blit(self.background_image, (0, 0))
+                self.screen.blit(self.player.image, self.player.rect)
+                # On affiche le boss pour l'intro
+                if self.boss:
+                    self.screen.blit(self.boss.image, self.boss.rect)
+
+                intro_lines_3 = [
+                    "ATTENTION !",
+                    "Le Gardien Suprême est réveillé.",
+                    "Esquivez ses projectiles",
+                    "et tirez vers le haut pour vaincre !"
+                ]
+                
+                text_color = (255, 215, 0)
+                bg_color = (0, 0, 0, 180)
+                start_y = 120
+                line_spacing = 50
+                total_height = len(intro_lines_3) * line_spacing + 40
+                
+                bg_surface = pygame.Surface((SCREEN_WIDTH, total_height), pygame.SRCALPHA)
+                bg_surface.fill(bg_color)
+                self.screen.blit(bg_surface, (0, start_y - 20))
+
+                for i, line in enumerate(intro_lines_3):
+                    text_surf = self.font_subtitle.render(line, True, text_color)
+                    rect = text_surf.get_rect(center=(SCREEN_WIDTH // 2, start_y + i * line_spacing))
+                    self.screen.blit(text_surf, rect)
+
+                pygame.display.flip()
+                pygame.time.delay(8000)
+
                 self.state = "combat_boss"
 
             # =====================
@@ -352,7 +421,6 @@ class Game:
                 self.screen.blit(desc_text, desc_rect)
 
                 if (pygame.time.get_ticks() // 500) % 2 == 0:
-                    # --- CORRECTION ICI : ROUGE POUR LE MENU ---
                     start_text = self.font.render("Appuyez sur ENTREE pour commencer", True, (255, 0, 0))
                     self.screen.blit(start_text, start_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 140)))
             
@@ -361,11 +429,31 @@ class Game:
                 self.screen.blit(self.background_image, (0, 0))
                 self.screen.blit(self.font.render(f"Score : {self.score}", True, (255, 0, 0)), (10, 10))
 
+                # --- INTRO TEXTE SALLE 1 ---
                 if self.state == "intro" and not self.intro_displayed:
-                    intro_text = self.font.render("Eliminez 30 ennemis pour ouvrir la salle !", True, (0, 0, 0))
-                    self.screen.blit(intro_text, intro_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)))
+                    intro_lines = [
+                        "Bienvenue dans la salle 1...",
+                        "Vous devez éliminer 30 ennemis",
+                        "afin d'atteindre l'énigme",
+                        "et peut-être la salle suivante."
+                    ]
+                    
+                    text_color = (255, 215, 0)
+                    bg_color = (0, 0, 0, 180)
+                    start_y = 120
+                    line_spacing = 50
+                    total_height = len(intro_lines) * line_spacing + 40
+                    bg_surface = pygame.Surface((SCREEN_WIDTH, total_height), pygame.SRCALPHA)
+                    bg_surface.fill(bg_color)
+                    self.screen.blit(bg_surface, (0, start_y - 20))
+
+                    for i, line in enumerate(intro_lines):
+                        text_surf = self.font_subtitle.render(line, True, text_color)
+                        rect = text_surf.get_rect(center=(SCREEN_WIDTH // 2, start_y + i * line_spacing))
+                        self.screen.blit(text_surf, rect)
+
                     pygame.display.flip()
-                    pygame.time.delay(2000)
+                    pygame.time.delay(8000)
                     self.state = "combat"
                     self.intro_displayed = True
 
@@ -420,9 +508,8 @@ class Game:
                     else:
                         msg_replay = "Appuyez sur ENTREE pour reprendre le niveau"
                     
-                    # --- CORRECTION ICI : ROUGE POUR LE GAME OVER AUSSI ---
                     replay_text = self.font.render(msg_replay, True, (255, 0, 0))
-                    self.screen.blit(replay_text, replay_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 10)))
+                    self.screen.blit(replay_text, replay_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50)))
 
             pygame.display.flip()
 
